@@ -1,0 +1,124 @@
+import { Button, Typography } from "antd";
+import ReactMarkdown from "react-markdown";
+
+const { Text } = Typography;
+
+type PromptType = "deepen" | "shift" | "empathy";
+
+interface FloatingGlassCardProps {
+  type: PromptType;
+  text: string;
+  onDismiss: () => void;
+}
+
+export function FloatingGlassCard({ type, text, onDismiss }: FloatingGlassCardProps) {
+  const label =
+    type === "deepen" ? "Deepen Inquiry" : type === "shift" ? "Shift Topic" : "Show Empathy";
+
+  const accentColor =
+    type === "deepen" ? "#1d4ed8" : type === "shift" ? "#0d9488" : "#e11d48";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 32,
+      }}
+    >
+      {/* Greyed-out blurred backdrop */}
+      <div
+        onClick={onDismiss}
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: "rgba(15,23,42,0.35)",
+          backdropFilter: "blur(4px)",
+        }}
+      />
+
+      {/* Floating glass card */}
+      <div
+        style={{
+          position: "relative",
+          maxWidth: 640,
+          width: "100%",
+          padding: 24,
+          borderRadius: 24,
+          background: "rgba(248,250,252,0.96)",
+          border: `2px solid ${accentColor}20`,
+          boxShadow: "0 22px 55px rgba(15,23,42,0.35)",
+          backdropFilter: "blur(16px)",
+          animation: "scaleIn 0.25s ease-out",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div style={{ paddingRight: 16, flex: 1 }}>
+            {/* Header Label */}
+            <Text
+              style={{
+                color: accentColor,
+                fontSize: 12,
+                letterSpacing: 0.06,
+                fontWeight: 600,
+                textTransform: "uppercase",
+              }}
+            >
+              {label}
+            </Text>
+
+            {/* Rich Text Content (Markdown) */}
+            <div 
+              style={{ 
+                marginTop: 12, 
+                fontSize: 17, 
+                lineHeight: 1.6, 
+                color: "#0f172a",
+                maxHeight: "60vh", // Prevent overflow on small screens
+                overflowY: "auto"
+              }}
+            >
+              <ReactMarkdown
+                components={{
+                  // 1. Render BOLD text using your accent color
+                  strong: ({ node, ...props }) => (
+                    <span style={{ color: accentColor, fontWeight: 700 }} {...props} />
+                  ),
+                  // 2. Add spacing between paragraphs
+                  p: ({ node, ...props }) => (
+                    <p style={{ margin: "0 0 16px 0" }} {...props} />
+                  ),
+                  // 3. Catch-all: If AI uses bullet points, color the bullet/number
+                  li: ({ node, ...props }) => (
+                    <li style={{ marginBottom: 8, color: accentColor }} {...props}>
+                       {/* Reset text color to black so only the bullet/number is colored */}
+                       <span style={{ color: "#0f172a" }}>{props.children}</span>
+                    </li>
+                  ),
+                }}
+              >
+                {text}
+              </ReactMarkdown>
+            </div>
+          </div>
+
+          <Button type="text" size="small" onClick={onDismiss} style={{color: "#64748b"}}>
+            ✕
+          </Button>
+        </div>
+      </div>
+      
+      {/* Simple animation keyframe */}
+      <style>{`
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
