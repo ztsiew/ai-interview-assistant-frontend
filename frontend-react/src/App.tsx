@@ -1,6 +1,3 @@
-// test push
-
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
@@ -20,8 +17,6 @@ import {
 } from "antd";
 import {
   AudioOutlined,
-  PauseCircleOutlined,
-  PlayCircleOutlined,
   EyeOutlined,
   FilePdfOutlined,
 } from "@ant-design/icons";
@@ -36,9 +31,9 @@ const { Title, Text } = Typography;
 
 export default function App() {
   // --- STATE ---
-  const [customPrompt, setCustomPrompt] = useState("Keep suggestions concise.");
+  const [customPrompt, setCustomPrompt] = useState("");
   const [planName, setPlanName] = useState<string | null>(null);
-  const [activePlanData, setActivePlanData] = useState<any>(null); 
+  const [activePlanData, setActivePlanData] = useState<any>(null);
   const [viewPlanOpen, setViewPlanOpen] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
@@ -52,15 +47,13 @@ export default function App() {
   const [scorecardMd, setScorecardMd] = useState<string>("");
   const [scorecardOpen, setScorecardOpen] = useState(false);
 
-  // --- TIMER STATE ---
-  const [allocatedTime, setAllocatedTime] = useState<number>(30); 
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0); 
+  const [allocatedTime, setAllocatedTime] = useState<number>(30);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [startTime, setStartTime] = useState<number | null>(null);
 
-  // --- LOCKED INSIGHTS STATE ---
   const [activePrompt, setActivePrompt] = useState<{
     type: "deepen" | "shift" | "empathy";
-    content: string; 
+    content: string;
   } | null>(null);
   const [hasNewEmpathy, setHasNewEmpathy] = useState(false);
 
@@ -68,6 +61,14 @@ export default function App() {
   const prevEmpathyRef = useRef<string>("");
 
   const API_URL = "http://localhost:8000";
+
+  // --- STYLES ---
+  // The "Transparent Blue-ish" Glass Style
+  const glassStyle = {
+    background: "rgba(230, 247, 255, 0.6)", // Light blue transparent
+    backdropFilter: "blur(12px)",            // Blurs content behind
+    border: "1px solid rgba(255, 255, 255, 0.4)", // Subtle border
+  };
 
   // --- UI HELPERS ---
   const formatTime = (totalSeconds: number) => {
@@ -77,38 +78,16 @@ export default function App() {
   };
 
   const statusUi = useMemo(() => {
-    if (isStopping) {
-      return {
-        badgeStatus: "processing" as const,
-        tagColor: "gold",
-        text: "Generating Scorecard…",
-        blink: false,
-      };
-    }
-    if (isRecording) {
-      return {
-        badgeStatus: "processing" as const,
-        tagColor: "red",
-        text: "LIVE RECORDING",
-        blink: true,
-      };
-    }
-    return {
-      badgeStatus: "default" as const,
-      tagColor: "default",
-      text: "System Ready",
-      blink: false,
-    };
+    if (isStopping) return { badgeStatus: "processing" as const, tagColor: "gold", text: "Generating Scorecard…", blink: false };
+    if (isRecording) return { badgeStatus: "processing" as const, tagColor: "red", text: "LIVE RECORDING", blink: true };
+    return { badgeStatus: "default" as const, tagColor: "default", text: "System Ready", blink: false };
   }, [isRecording, isStopping]);
 
   // --- API FUNCTIONS ---
   async function uploadPdf(file: File) {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`${API_URL}/upload_pdf`, {
-      method: "POST",
-      body: formData,
-    });
+    const res = await fetch(`${API_URL}/upload_pdf`, { method: "POST", body: formData });
     if (!res.ok) throw new Error("Upload failed");
     return await res.json();
   }
@@ -126,16 +105,13 @@ export default function App() {
     });
   }
 
-  async function startRecording() {
-    await fetch(`${API_URL}/start`, { method: "POST" });
-  }
-
+  async function startRecording() { await fetch(`${API_URL}/start`, { method: "POST" }); }
   async function stopRecording() {
     const res = await fetch(`${API_URL}/stop`, { method: "POST" });
     return await res.json();
   }
 
-  // --- EFFECTS & POLLING ---
+  // --- EFFECTS ---
   async function refreshStatusOnce() {
     try {
       const s = await getStatus();
@@ -146,44 +122,24 @@ export default function App() {
       const nextEmpathy = s.empathy || "Waiting for insights...";
       setEmpathy(nextEmpathy);
 
-      if (
-        nextEmpathy &&
-        nextEmpathy !== prevEmpathyRef.current &&
-        !/status:\s*normal/i.test(nextEmpathy)
-      ) {
+      if (nextEmpathy && nextEmpathy !== prevEmpathyRef.current && !/status:\s*normal/i.test(nextEmpathy)) {
         setHasNewEmpathy(true);
       }
       prevEmpathyRef.current = nextEmpathy;
-    } catch (e) {
-      console.error("Polling error", e);
-    }
+    } catch (e) { console.error("Polling error", e); }
   }
 
   useEffect(() => {
-    refreshStatusOnce();
-    return () => {
-      if (pollTimer.current) clearInterval(pollTimer.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isRecording) {
-      pollTimer.current = window.setInterval(refreshStatusOnce, 1000);
-    } else {
-      if (pollTimer.current) window.clearInterval(pollTimer.current);
-    }
-    return () => {
-      if (pollTimer.current) window.clearInterval(pollTimer.current);
-    };
+    if (isRecording) { pollTimer.current = window.setInterval(refreshStatusOnce, 1000); }
+    else { if (pollTimer.current) window.clearInterval(pollTimer.current); }
+    return () => { if (pollTimer.current) window.clearInterval(pollTimer.current); };
   }, [isRecording]);
 
-  // Upward Clock Timer Effect
   useEffect(() => {
     let clockInterval: number;
     if (isRecording && startTime) {
       clockInterval = window.setInterval(() => {
-        const secondsPassed = Math.floor((Date.now() - startTime) / 1000);
-        setElapsedSeconds(secondsPassed);
+        setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
       }, 1000);
     }
     return () => clearInterval(clockInterval);
@@ -198,426 +154,216 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [activePrompt]);
 
-  // --- EVENT HANDLERS ---
+  // --- HANDLERS ---
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const hide = message.loading("Reading PDF & Generating Strategy...", 0);
+    const hide = message.loading("Reading PDF Strategy...", 0);
     try {
       const result = await uploadPdf(file);
       setPlanName(file.name);
-      setActivePlanData(result.data); 
-      message.success("Strategy Ready!");
-    } catch (err) {
-      message.error("Failed to process PDF");
-    } finally {
-      hide();
-    }
+      setActivePlanData(result.data);
+      message.success("Strategy Loaded!");
+    } catch (err) { message.error("Upload failed"); } finally { hide(); }
   };
 
-  async function onUpdateConfig() {
-    try {
-      await updateConfig(customPrompt);
-      message.success("Instructions updated!");
-    } catch (e: any) {
-      message.error("Failed to update");
-    }
-  }
-
-  async function onStart() {
-    try {
-      await startRecording();
-      await refreshStatusOnce();
-      
-      // Reset and Start Clock
-      setElapsedSeconds(0);
-      setStartTime(Date.now());
-      
-      setIsRecording(true);
-      message.success(`Interview started. Goal: ${allocatedTime} minutes.`);
-    } catch (e: any) {
-      message.error(e?.message ?? "Cannot connect to backend");
-    }
-  }
-
-  async function onStop() {
-    setIsStopping(true);
-    if (pollTimer.current) window.clearInterval(pollTimer.current);
-    try {
-      const res = await stopRecording();
-      setScorecardMd(res.scorecard || "");
-      if (res.scorecard) setScorecardOpen(true);
-      await refreshStatusOnce();
-      setIsRecording(false);
-      setStartTime(null); // Stop clock
-    } catch (e: any) {
-      message.error("Error stopping");
-    } finally {
-      setIsStopping(false);
-    }
-  }
+  // --- COMPONENT: STRATEGY VISUALIZER (Shared Logic) ---
+  const VisualSteps = () => (
+    <Steps direction="vertical" size="small" items={activePlanData.interview_guides_collection[0].themes.map((t: any) => ({
+      title: <Text strong style={{ fontSize: 14 }}>{t.title}</Text>,
+      description: (
+        <div style={{ marginBottom: 12 }}>
+          <Tag color="blue" style={{ fontSize: 10 }}>{t.objective}</Tag>
+          <List size="small" dataSource={t.questions} renderItem={(q: any) => (
+            <List.Item style={{ padding: "2px 0", border: "none" }}>
+              <Text style={{ fontSize: 12 }} type="secondary">• {q.text}</Text>
+            </List.Item>
+          )} />
+        </div>
+      )
+    }))} />
+  );
 
   return (
-    <Layout className="app-shell">
-      {/* --- HEADER --- */}
-      <Header
-        style={{
-          background: "transparent",
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          rowGap: 8,
-          position: "relative",
-          zIndex: 5,
-          paddingInline: 24,
-          paddingBlock: 16,
-        }}
-      >
-        <Space size={16} style={{ minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle at 30% 20%, #fee2ff 0, #e0f2fe 40%, #1d4ed8 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 10px 30px rgba(37, 99, 235, 0.35)",
-            }}
-          >
-            <AudioOutlined style={{ fontSize: 18, color: "white" }} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <Title level={4} style={{ margin: 0, fontSize: 16, lineHeight: 1.2 }}>
-              AI Interview Assistant
-            </Title>
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              PDF-to-Strategy Engine
-            </Text>
-          </div>
+    <Layout className="app-shell" style={{ minHeight: "100vh", background: "#f0f2f5" }}>
+      <Header style={{ background: "transparent", display: "flex", alignItems: "center", justifyContent: "space-between", paddingInline: 24, height: 64 }}>
+        <Space size={12}>
+          <AudioOutlined style={{ fontSize: 20, color: "#1890ff" }} />
+          <Title level={4} style={{ margin: 0 }}>AI Interview Assistant</Title>
         </Space>
-
-        <Space style={{ flexShrink: 0 }}>
-          {/* TIMER DISPLAY */}
+        <Space>
           {isRecording && (
-            <Tag 
-              color={elapsedSeconds > (allocatedTime * 60) ? "error" : "blue"} 
-              style={{ borderRadius: 999, fontWeight: 'bold' }}
-            >
-              DURATION: {formatTime(elapsedSeconds)} / {formatTime(allocatedTime * 60)}
+            <Tag color={elapsedSeconds > (allocatedTime * 60) ? "error" : "blue"} style={{ borderRadius: 999, fontWeight: 'bold' }}>
+              {formatTime(elapsedSeconds)} / {formatTime(allocatedTime * 60)}
             </Tag>
           )}
           <Badge status={statusUi.badgeStatus} />
-          <Tag
-            className={statusUi.blink ? "blink" : undefined}
-            color={statusUi.tagColor === "default" ? "#e5e7eb" : statusUi.tagColor}
-            style={{ borderRadius: 999, paddingInline: 12 }}
-          >
-            {statusUi.text}
-          </Tag>
+          <Tag color={statusUi.tagColor === "default" ? "#d9d9d9" : statusUi.tagColor}>{statusUi.text}</Tag>
         </Space>
       </Header>
 
-      <Layout style={{ padding: 16, paddingTop: 18, gap: 12, background: "transparent" }}>
-        {/* --- SIDER --- */}
-        <Sider
-          width={280}
-          theme="light"
-          className="glass-panel"
-          style={{
-            borderRadius: 18,
-            padding: 18,
-            alignSelf: "flex-start",
-            height: "fit-content",
-            maxHeight: 700,
-            overflow: "auto",
-          }}
-        >
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            {/* 1. UPLOAD PDF */}
-            <div>
-              <Text type="secondary" style={{ fontWeight: 700, fontSize: 12 }}>
-                1. INTERVIEW PLAN (PDF)
-              </Text>
-              <div style={{ marginTop: 8 }}>
-                <Input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handlePdfUpload}
-                  prefix={<FilePdfOutlined />}
-                  style={{ fontSize: 12 }}
-                />
+      <Layout style={{ padding: "0 16px 16px", background: "transparent" }}>
+        
+        {/* === VIEW 1: PRE-INTERVIEW (CENTERED) === */}
+        {!isRecording ? (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "calc(100vh - 100px)", width: "100%" }}>
+            <Card style={{ width: 420, borderRadius: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+              <Title level={4} style={{ textAlign: "center", marginBottom: 24 }}>Setup & Configuration</Title>
+              
+              <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                {/* 1. PDF Upload */}
+                <div>
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>1. INTERVIEW PLAN</Text>
+                  <Input type="file" accept=".pdf" onChange={handlePdfUpload} size="small" style={{ marginTop: 4 }} />
+                  
+                  {/* SUCCESS STATE: Loaded & Preview Button */}
+                  {planName && activePlanData && (
+                    <div style={{ marginTop: 8 }}>
+                       <Text type="success" style={{ fontSize: 12 }}>Loaded: <b>{planName}</b></Text>
+                       <Button size="small" icon={<EyeOutlined />} onClick={() => setViewPlanOpen(true)} block style={{ marginTop: 4 }}>
+                          View Generated Strategy
+                       </Button>
+                    </div>
+                  )}
+                </div>
 
-                {planName && (
-                  <div style={{ marginTop: 8 }}>
-                    <Text
-                      type="success"
-                      style={{ marginTop: 8, display: "block", fontSize: 12, marginBottom: 4 }}
-                    >
-                      Loaded: <b>{planName}</b>
-                    </Text>
-                    <Button
-                      size="small"
-                      icon={<EyeOutlined />}
-                      onClick={() => setViewPlanOpen(true)}
-                      block
-                    >
-                      View Generated Strategy
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
+                {/* 2. Instructions */}
+                <div>
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. AI INSTRUCTIONS</Text>
+                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 11 }} placeholder="e.g. 'Use echo probes'..." />
+                  <Button size="small" onClick={() => updateConfig(customPrompt)} block style={{ marginTop: 4 }}>Update Rules</Button>
+                </div>
 
-            {/* 2. INSTRUCTIONS */}
-            <div>
-              <Text type="secondary" style={{ fontWeight: 700, fontSize: 12 }}>
-                2. AI INSTRUCTIONS
-              </Text>
-              <Input.TextArea
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                rows={4}
-                style={{ marginTop: 8 }}
-              />
-              <Button onClick={onUpdateConfig} style={{ marginTop: 8 }} block>
-                Update Config
-              </Button>
-            </div>
+                {/* 3. Duration (Visible ONLY in Pre-Interview) */}
+                <div>
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>3. TARGET DURATION (MINS)</Text>
+                  <Input type="number" value={allocatedTime} onChange={(e) => setAllocatedTime(Number(e.target.value))} size="small" suffix="min" style={{ marginTop: 4 }} />
+                </div>
 
-            <Divider style={{ margin: "4px 0 4px" }} />
-
-            {/* 3. DURATION SETTING */}
-            <div>
-              <Text type="secondary" style={{ fontWeight: 700, fontSize: 12 }}>
-                3. TARGET DURATION (MINS)
-              </Text>
-              <Input 
-                type="number" 
-                value={allocatedTime} 
-                onChange={(e) => setAllocatedTime(Number(e.target.value))}
-                disabled={isRecording}
-                style={{ marginTop: 8 }}
-                suffix="min"
-              />
-            </div>
-
-            {/* 4. CONTROLS */}
-            <div style={{ marginTop: 8, paddingBottom: 4 }}>
-              {!isRecording ? (
-                <Button
-                  type="primary"
-                  icon={<PlayCircleOutlined />}
-                  size="large"
-                  block
-                  onClick={onStart}
-                  disabled={isStopping}
-                >
-                  Start Recording
+                {/* Start Button */}
+                <Button type="primary" block size="large" onClick={async () => { await startRecording(); setElapsedSeconds(0); setStartTime(Date.now()); setIsRecording(true); }}>
+                  Start Interview
                 </Button>
-              ) : (
-                <Button
-                  danger
-                  type="primary"
-                  icon={<PauseCircleOutlined />}
-                  size="large"
-                  block
-                  onClick={onStop}
-                  loading={isStopping}
-                >
-                  Stop &amp; Score
-                </Button>
-              )}
-            </div>
-          </Space>
-        </Sider>
-
-        {/* --- MAIN CONTENT --- */}
-        <Content style={{ padding: 0, overflow: "auto" }}>
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <Card
-              title="📜 Live Transcript"
-              extra={<Text type="secondary">Helvetica Style</Text>}
-              className="glass-panel"
-              styles={{ body: { minHeight: 220, borderRadius: 16 } }}
-              bordered={false}
+              </Space>
+            </Card>
+          </div>
+        ) : (
+          /* === VIEW 2: LIVE INTERVIEW (SPLIT SCREEN) === */
+          <>
+            {/* SIDER: Instructions & Transcript */}
+            <Sider 
+              width={320} 
+              // Removed theme="light" to allow glass background
+              style={{ 
+                ...glassStyle, // <--- APPLY GLASS STYLE
+                borderRadius: 16, 
+                padding: 16, 
+                marginRight: 16, 
+                height: "calc(100vh - 80px)", 
+                display: "flex", 
+                flexDirection: "column" 
+              }}
             >
-              <div className="transcript-container">
-                {transcript.length === 0 && (
-                  <Text type="secondary">Waiting for speech...</Text>
-                )}
-                {transcript.map((segment, index) => {
-                  // Bold and increase size for the newly added transcript
-                  const isLast = index === transcript.length - 1;
-                  return (
-                    <span
-                      key={index}
-                      className={isLast ? "transcript-latest" : "transcript-segment"}
-                    >
+              <Space direction="vertical" size={16} style={{ width: "100%", height: "100%" }}>
+                
+                {/* 1. File (Disabled) */}
+                <div>
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>1. INTERVIEW PLAN</Text>
+                  <Input type="file" disabled size="small" style={{ marginTop: 4 }} />
+                  {planName && <Text type="secondary" style={{ fontSize: 10, display: "block", marginTop: 2 }}>Using: {planName}</Text>}
+                </div>
+
+                {/* 2. Instructions */}
+                <div>
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. AI INSTRUCTIONS</Text>
+                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 11 }} />
+                  <Button size="small" onClick={() => updateConfig(customPrompt)} block style={{ marginTop: 4 }}>Update Rules</Button>
+                </div>
+
+                {/* 3. Stop Button */}
+                <Button type="primary" danger block size="large" onClick={async () => { setIsStopping(true); const res = await stopRecording(); setScorecardMd(res.scorecard || ""); if (res.scorecard) setScorecardOpen(true); setIsRecording(false); setIsStopping(false); }}>
+                  Stop & Score
+                </Button>
+
+                <Divider style={{ margin: "4px 0", fontSize: 10 }}>LIVE TRANSCRIPT</Divider>
+                <div style={{ flex: 1, overflowY: "auto", fontSize: "11px", lineHeight: "1.5", padding: "10px", background: "rgba(255,255,255,0.5)", borderRadius: 8, border: "1px solid #eee" }}>
+                  {transcript.map((segment, index) => (
+                    <span key={index} style={{ color: index === transcript.length - 1 ? "#000" : "#666", fontWeight: index === transcript.length - 1 ? "bold" : "normal" }}>
                       {segment}{" "}
                     </span>
-                  );
-                })}
-              </div>
-            </Card>
+                  ))}
+                </div>
+              </Space>
+            </Sider>
 
-            <Card
-              title="AI Coaching"
-              extra={<Text type="secondary">Tap a card to surface a ready-to-use prompt</Text>}
-              className="glass-panel"
-              styles={{ body: { padding: 0, minHeight: 320 } }}
-              bordered={false}
-            >
-              <div style={{ padding: "10px 12px 12px" }}>
-                <MagicActionDeck
-                  hasNewEmpathy={hasNewEmpathy}
-                  onActionClick={(type) => {
-                    // LOCK CONTENT: Determine current AI text and save it to activePrompt
-                    let selectedContent = "";
-                    if (type === "deepen") selectedContent = followup;
-                    else if (type === "shift") selectedContent = transition;
-                    else if (type === "empathy") selectedContent = empathy;
-
-                    // Fallback logic
-                    if (!selectedContent || /waiting for insights/i.test(selectedContent)) {
-                      selectedContent = 
-                        type === "deepen" ? "Can you walk me through a specific example?" :
-                        type === "shift" ? "I'd love to shift gears and talk about the next theme." :
-                        "I can hear this mattered to you. Could you share more?";
-                    }
-
-                    // Save BOTH type and content to state to "lock" it
-                    setActivePrompt({ type, content: selectedContent });
-
-                    if (type === "empathy") {
-                      setHasNewEmpathy(false);
-                    }
-                  }}
-                />
-
-                {activePrompt && (
-                  <FloatingGlassCard
-                    type={activePrompt.type}
-                    text={activePrompt.content.trim()} 
-                    onDismiss={() => setActivePrompt(null)}
-                  />
+            {/* CONTENT: Strategy & Coaching */}
+            <Content style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Card 1: Interview Plan - VISUAL ONLY */}
+              <Card 
+                title="🗺️ Strategy Mapping" 
+                style={{ 
+                  ...glassStyle, // <--- APPLY GLASS STYLE
+                  borderRadius: 16, 
+                  flex: 1.2, 
+                  overflow: "hidden" 
+                }} 
+                styles={{ body: { height: "100%", overflowY: "auto", padding: 16 }}}
+              >
+                {activePlanData ? <VisualSteps /> : (
+                  <div style={{ textAlign: "center", padding: 40 }}><FilePdfOutlined style={{ fontSize: 30, color: "#ccc" }} /><br/><Text type="secondary">No plan loaded.</Text></div>
                 )}
-              </div>
-            </Card>
-          </Space>
-        </Content>
+              </Card>
+
+              {/* Card 2: AI Coaching Insights */}
+              <Card 
+                title="💡 AI Coaching Insights" 
+                style={{
+                  ...glassStyle, // <--- APPLY GLASS STYLE
+                  borderRadius: 16,
+                  position: "relative", // Ensures "absolute" children are contained here
+                  overflow: "hidden"    // Ensures pop-up doesn't spill out visually
+                }}
+                styles={{ body: { padding: 0, minHeight: 320 } }} 
+                bordered={false}
+              >
+                <div style={{ padding: "10px 12px 12px" }}>
+                  <MagicActionDeck
+                    hasNewEmpathy={hasNewEmpathy}
+                    onActionClick={(type) => {
+                      let content = type === "deepen" ? followup : type === "shift" ? transition : empathy;
+                      setActivePrompt({ type, content: content || "Generating..." });
+                      if (type === "empathy") setHasNewEmpathy(false);
+                    }}
+                  />
+                  {activePrompt && (
+                    <FloatingGlassCard 
+                      type={activePrompt.type} 
+                      text={activePrompt.content.trim()} 
+                      onDismiss={() => setActivePrompt(null)} 
+                    />
+                  )}
+                </div>
+              </Card>
+            </Content>
+          </>
+        )}
       </Layout>
 
-      {/* --- PLAN VIEW MODAL (RESTORED) --- */}
-      <Modal
-        title="🗺️ AI-Generated Interview Strategy"
-        open={viewPlanOpen}
-        onCancel={() => setViewPlanOpen(false)}
-        footer={[
-          <Button key="close" onClick={() => setViewPlanOpen(false)}>
-            Close
-          </Button>,
-        ]}
-        width={700}
-      >
+      {/* --- PREVIEW MODAL --- */}
+      <Modal title="🗺️ Plan Preview" open={viewPlanOpen} onCancel={() => setViewPlanOpen(false)} footer={[<Button key="close" onClick={() => setViewPlanOpen(false)}>Close</Button>]} width={700}>
         {activePlanData ? (
-          <Tabs
-            defaultActiveKey="1"
-            items={[
-              {
-                key: "1",
-                label: "👀 Visual Overview",
-                children: (
-                  <Steps
-                    direction="vertical"
-                    size="small"
-                    current={-1}
-                    items={activePlanData.interview_guides_collection[0].themes.map(
-                      (theme: any) => ({
-                        title: <Text strong>{theme.title}</Text>,
-                        description: (
-                          <div style={{ marginTop: 8, marginBottom: 24 }}>
-                            <Tag color="geekblue" style={{ marginBottom: 8 }}>
-                              {theme.objective}
-                            </Tag>
-                            <List
-                              size="small"
-                              dataSource={theme.questions}
-                              renderItem={(q: any) => (
-                                <List.Item
-                                  style={{
-                                    padding: "4px 0",
-                                    fontSize: 13,
-                                    border: "none",
-                                  }}
-                                >
-                                  <Text type="secondary" style={{ marginRight: 8 }}>
-                                    •
-                                  </Text>
-                                  {q.text}
-                                </List.Item>
-                              )}
-                            />
-                          </div>
-                        ),
-                      })
-                    )}
-                  />
-                ),
-              },
-              {
-                key: "2",
-                label: "⚙️ Raw JSON Code",
-                children: (
-                  <div
-                    style={{
-                      maxHeight: "50vh",
-                      overflow: "auto",
-                      background: "#1e293b",
-                      color: "#e2e8f0",
-                      padding: 16,
-                      borderRadius: 8,
-                      fontFamily: "monospace",
-                      fontSize: 12,
-                    }}
-                  >
-                    <pre style={{ margin: 0 }}>
-                      {JSON.stringify(activePlanData, null, 2)}
-                    </pre>
-                  </div>
-                ),
-              },
-            ]}
-          />
-        ) : (
-          <div style={{ padding: 20, textAlign: "center" }}>
-            <Text type="secondary">No interview plan loaded yet.</Text>
-          </div>
-        )}
+          <Tabs items={[
+            { key: "1", label: "Visual Overview", children: <VisualSteps /> },
+            { key: "2", label: "Raw JSON", children: <div style={{ background: "#1e293b", color: "#e2e8f0", padding: 12, borderRadius: 8, fontSize: 10, maxHeight: "400px", overflow: "auto" }}><pre>{JSON.stringify(activePlanData, null, 2)}</pre></div> }
+          ]} />
+        ) : <Text type="secondary">No data.</Text>}
       </Modal>
 
-      {/* --- SCORECARD MODAL (RESTORED) --- */}
-      <Modal
-        title="📊 Interview Scorecard"
-        open={scorecardOpen}
-        onCancel={() => setScorecardOpen(false)}
-        footer={[
-          <Button key="close" onClick={() => setScorecardOpen(false)}>
-            Close
-          </Button>,
-        ]}
-        width={900}
-        styles={{ body: { maxHeight: "70vh", overflow: "auto" } }}
-      >
-        {scorecardMd ? (
+      {/* --- SCORECARD MODAL --- */}
+      <Modal title="📊 Interview Scorecard" open={scorecardOpen} onCancel={() => setScorecardOpen(false)} width={800} footer={null}>
+        <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{scorecardMd}</ReactMarkdown>
-        ) : (
-          <Text type="secondary">Generating report…</Text>
-        )}
+        </div>
       </Modal>
     </Layout>
   );

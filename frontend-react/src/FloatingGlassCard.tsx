@@ -21,7 +21,8 @@ export function FloatingGlassCard({ type, text, onDismiss }: FloatingGlassCardPr
   return (
     <div
       style={{
-        position: "fixed",
+        // CHANGED: "absolute" keeps it inside the parent card, not the whole screen
+        position: "absolute", 
         inset: 0,
         zIndex: 1000,
         display: "flex",
@@ -38,6 +39,7 @@ export function FloatingGlassCard({ type, text, onDismiss }: FloatingGlassCardPr
           inset: 0,
           backgroundColor: "rgba(15,23,42,0.35)",
           backdropFilter: "blur(4px)",
+          borderRadius: "inherit", // Inherit corners from parent if needed
         }}
       />
 
@@ -78,24 +80,20 @@ export function FloatingGlassCard({ type, text, onDismiss }: FloatingGlassCardPr
                 fontSize: 17, 
                 lineHeight: 1.6, 
                 color: "#0f172a",
-                maxHeight: "60vh", // Prevent overflow on small screens
+                maxHeight: "60vh", 
                 overflowY: "auto"
               }}
             >
               <ReactMarkdown
                 components={{
-                  // 1. Render BOLD text using your accent color
                   strong: ({ node, ...props }) => (
                     <span style={{ color: accentColor, fontWeight: 700 }} {...props} />
                   ),
-                  // 2. Add spacing between paragraphs
                   p: ({ node, ...props }) => (
                     <p style={{ margin: "0 0 16px 0" }} {...props} />
                   ),
-                  // 3. Catch-all: If AI uses bullet points, color the bullet/number
                   li: ({ node, ...props }) => (
                     <li style={{ marginBottom: 8, color: accentColor }} {...props}>
-                       {/* Reset text color to black so only the bullet/number is colored */}
                        <span style={{ color: "#0f172a" }}>{props.children}</span>
                     </li>
                   ),
@@ -112,7 +110,6 @@ export function FloatingGlassCard({ type, text, onDismiss }: FloatingGlassCardPr
         </div>
       </div>
       
-      {/* Simple animation keyframe */}
       <style>{`
         @keyframes scaleIn {
           from { opacity: 0; transform: scale(0.95); }
