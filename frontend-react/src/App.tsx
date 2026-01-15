@@ -56,7 +56,6 @@ export default function App() {
   const API_URL = "http://localhost:8000";
 
   // --- STYLES ---
-  // The "Transparent Blue-ish" Glass Style
   const glassStyle = {
     background: "rgba(230, 247, 255, 0.6)", 
     backdropFilter: "blur(12px)",
@@ -65,7 +64,6 @@ export default function App() {
     borderRadius: "16px",
   };
 
-  // Shared background for Landing and Setup pages
   const sharedBackgroundStyle: React.CSSProperties = {
     minHeight: "100vh",
     width: "100%",
@@ -77,7 +75,7 @@ export default function App() {
     flexDirection: "column"
   };
 
-  // --- API FUNCTIONS (Retained from original) ---
+  // --- API FUNCTIONS ---
   async function uploadPdf(file: File) {
     const formData = new FormData();
     formData.append("file", file);
@@ -105,7 +103,7 @@ export default function App() {
     return await res.json();
   }
 
-  // --- EFFECTS (Retained from original) ---
+  // --- EFFECTS ---
   async function refreshStatusOnce() {
     try {
       const s = await getStatus();
@@ -115,6 +113,7 @@ export default function App() {
       setTransition(s.transition || "Waiting for insights...");
       const nextEmpathy = s.empathy || "Waiting for insights...";
       setEmpathy(nextEmpathy);
+      // Determine if a new empathy/insight status has arrived
       if (nextEmpathy && nextEmpathy !== prevEmpathyRef.current && !/status:\s*normal/i.test(nextEmpathy)) {
         setHasNewEmpathy(true);
       }
@@ -138,13 +137,6 @@ export default function App() {
     return () => clearInterval(clockInterval);
   }, [isRecording, startTime]);
 
-  useEffect(() => {
-    if (!activePrompt) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setActivePrompt(null); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [activePrompt]);
-
   // --- HANDLERS ---
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -160,13 +152,13 @@ export default function App() {
 
   const VisualSteps = () => (
     <Steps direction="vertical" size="small" items={activePlanData?.interview_guides_collection[0].themes.map((t: any) => ({
-      title: <Text strong style={{ fontSize: 14 }}>{t.title}</Text>,
+      title: <Text strong style={{ fontSize: 14, color: "#1e293b" }}>{t.title}</Text>,
       description: (
         <div style={{ marginBottom: 12 }}>
           <Tag color="blue" style={{ fontSize: 10 }}>{t.objective}</Tag>
           <List size="small" dataSource={t.questions} renderItem={(q: any) => (
             <List.Item style={{ padding: "2px 0", border: "none" }}>
-              <Text style={{ fontSize: 13, color: "rgba(0, 0, 0, 0.72)" }} type="secondary">• {q.text}</Text>
+              <Text style={{ fontSize: 13, color: "#475569" }}>• {q.text}</Text>
             </List.Item>
           )} />
         </div>
@@ -186,9 +178,6 @@ export default function App() {
     return { badgeStatus: "default" as const, tagColor: "default", text: "System Ready", blink: false };
   }, [isRecording, isStopping]);
 
-  // --- RENDER LOGIC ---
-
-  // 1. LANDING PAGE VIEW
   if (showLanding) {
     return (
       <div style={sharedBackgroundStyle}>
@@ -199,15 +188,9 @@ export default function App() {
           <div style={{ ...glassStyle, padding: "60px 40px", textAlign: "center", maxWidth: 700, boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
             <Title level={1} style={{ marginBottom: 16 }}>Welcome to AI Interview Assistant!</Title>
             <Text style={{ fontSize: 19, display: "block", marginBottom: 32, color: "#222", fontWeight: 500 }}>
-              An intelligent companion providing real-time guidance and strategic support directly to the interviewer during the conversation.
+              An intelligent companion providing real-time guidance and strategic support.
             </Text>
-            <Button 
-              type="primary" 
-              size="large" 
-              icon={<ArrowRightOutlined />} 
-              onClick={() => setShowLanding(false)} 
-              style={{ height: 55, paddingInline: 40, borderRadius: 8, fontSize: 18, fontWeight: 'bold' }}
-            >
+            <Button type="primary" size="large" icon={<ArrowRightOutlined />} onClick={() => setShowLanding(false)} style={{ height: 55, paddingInline: 40, borderRadius: 8, fontSize: 18, fontWeight: 'bold' }}>
               GET STARTED
             </Button>
           </div>
@@ -216,13 +199,8 @@ export default function App() {
     );
   }
 
-  // 2. MAIN APPLICATION (SETUP OR LIVE)
   return (
-    <Layout className="app-shell" style={{ 
-      minHeight: "100vh", 
-      background: isRecording ? "#f0f2f5" : "transparent",
-      ...( !isRecording ? sharedBackgroundStyle : {} ) 
-    }}>
+    <Layout className="app-shell" style={{ minHeight: "100vh", background: isRecording ? "#f0f2f5" : "transparent", ...( !isRecording ? sharedBackgroundStyle : {} ) }}>
       <Header style={{ background: isRecording ? "transparent" : "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "space-between", paddingInline: 24, height: 64 }}>
         <Space size={12}>
           <AudioOutlined style={{ fontSize: 20, color: "#1890ff" }} />
@@ -244,22 +222,15 @@ export default function App() {
           /* SETUP VIEW */
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "calc(100vh - 100px)", width: "100%" }}>
             <Card style={{ ...glassStyle, width: 420, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-              <Title level={4} style={{ textAlign: "center", marginBottom: 24 }}>Interview Setup & Configuration</Title>
+              <Title level={4} style={{ textAlign: "center", marginBottom: 24 }}>Setup & Configuration</Title>
               <Space direction="vertical" size={16} style={{ width: "100%" }}>
                 <div>
                   <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>1. INTERVIEW PLAN</Text>
                   <Input type="file" accept=".pdf" onChange={handlePdfUpload} size="small" style={{ marginTop: 4 }} />
-                  {planName && activePlanData && (
-                    <div style={{ marginTop: 1 }}>
-                       <Text type="success" style={{ fontSize: 12, color: "black" }}>Loaded: <b>{planName}</b></Text>
-                       <Button size="small" icon={<EyeOutlined />} onClick={() => setViewPlanOpen(true)} block style={{ marginTop: 12 }}>View Generated Strategy</Button>
-                    </div>
-                  )}
                 </div>
                 <div>
-                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. CUSTOM INSTRUCTIONS</Text>
-                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 13, fontStyle: "italic" }} placeholder="e.g. 'Keep your responses concise'..." />
-                  <Button size="small" onClick={() => updateConfig(customPrompt)} block style={{ marginTop: 4 }}>Update</Button>
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. STRATEGIC DIRECTIVES</Text>
+                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 11 }} />
                 </div>
                 <div>
                   <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>3. TARGET DURATION (MINS)</Text>
@@ -272,7 +243,7 @@ export default function App() {
             </Card>
           </div>
         ) : (
-          /* LIVE VIEW - DIMENSIONS RESTORED */
+          /* LIVE VIEW */
           <>
             <Sider width={320} style={{ ...glassStyle, padding: 16, marginRight: 16, height: "calc(100vh - 80px)", display: "flex", flexDirection: "column" }}>
               <Space direction="vertical" size={16} style={{ width: "100%", height: "100%" }}>
@@ -282,7 +253,18 @@ export default function App() {
                   {planName && <Text type="secondary" style={{ fontSize: 10, display: "block", marginTop: 2 }}>Using: {planName}</Text>}
                 </div>
                 <div>
-                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. AI INSTRUCTIONS</Text>
+                  <Text 
+                    style={{ 
+                      fontWeight: 700, 
+                      fontSize: 10, 
+                      // Turns pinkish if a new insight arrives, otherwise stays grey
+                      color: hasNewEmpathy ? "#e11d48" : "rgba(0, 0, 0, 0.45)", 
+                      transition: "color 0.3s ease",
+                      display: "block"
+                    }}
+                  >
+                    2. STRATEGIC DIRECTIVES {hasNewEmpathy && "• NEW INSIGHT"}
+                  </Text>
                   <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 11 }} />
                   <Button size="small" onClick={() => updateConfig(customPrompt)} block style={{ marginTop: 4 }}>Update Rules</Button>
                 </div>
@@ -290,7 +272,7 @@ export default function App() {
                   Stop & Score
                 </Button>
                 <Divider style={{ margin: "4px 0", fontSize: 10 }}>LIVE TRANSCRIPT</Divider>
-                <div style={{ height: 500, overflowY: "auto", fontSize: "10px", lineHeight: "1.5", padding: "10px", background: "rgba(255,255,255,0.5)", borderRadius: 8, border: "1px solid #eee" }}>
+                <div style={{ height: 500, overflowY: "auto", fontSize: "11px", lineHeight: "1.5", padding: "10px", background: "rgba(255,255,255,0.5)", borderRadius: 8, border: "1px solid #eee" }}>
                   {transcript.map((segment, index) => (
                     <span key={index} style={{ color: index === transcript.length - 1 ? "#000" : "#666", fontWeight: index === transcript.length - 1 ? "bold" : "normal" }}>{segment}{" "}</span>
                   ))}
@@ -299,7 +281,7 @@ export default function App() {
             </Sider>
 
             <Content style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Card title="🗺️ Strategy Mapping" style={{ ...glassStyle, height: 450, overflow: "hidden" }} styles={{ body: { height: "100%", overflowY: "auto", padding: 16 }}}>
+              <Card title="🗺️ Strategy Mapping" style={{ ...glassStyle, flex: 1.2, overflow: "hidden" }} styles={{ body: { height: "100%", overflowY: "auto", padding: 16 }}}>
                 {activePlanData ? <VisualSteps /> : <div style={{ textAlign: "center", padding: 40 }}><FilePdfOutlined style={{ fontSize: 30, color: "#ccc" }} /><br/><Text type="secondary">No plan loaded.</Text></div>}
               </Card>
 
@@ -308,7 +290,7 @@ export default function App() {
                   <MagicActionDeck hasNewEmpathy={hasNewEmpathy} onActionClick={(type) => {
                       let content = type === "deepen" ? followup : type === "shift" ? transition : empathy;
                       setActivePrompt({ type, content: content || "Generating..." });
-                      if (type === "empathy") setHasNewEmpathy(false);
+                      if (type === "empathy") setHasNewEmpathy(false); // Reset status once viewed
                     }}
                   />
                   {activePrompt && <FloatingGlassCard type={activePrompt.type} text={activePrompt.content.trim()} onDismiss={() => setActivePrompt(null)} />}
@@ -319,10 +301,6 @@ export default function App() {
         )}
       </Layout>
 
-      {/* MODALS */}
-      <Modal title="🗺️ Plan Preview" open={viewPlanOpen} onCancel={() => setViewPlanOpen(false)} footer={[<Button key="close" onClick={() => setViewPlanOpen(false)}>Close</Button>]} width={700}>
-        {activePlanData ? <Tabs items={[{ key: "1", label: "Visual Overview", children: <VisualSteps /> }, { key: "2", label: "Raw JSON", children: <div style={{ background: "#1e293b", color: "#e2e8f0", padding: 12, borderRadius: 8, fontSize: 10, maxHeight: "400px", overflow: "auto" }}><pre>{JSON.stringify(activePlanData, null, 2)}</pre></div> }]} /> : <Text type="secondary">No data.</Text>}
-      </Modal>
       <Modal title="📊 Interview Scorecard" open={scorecardOpen} onCancel={() => setScorecardOpen(false)} width={800} footer={null}>
         <div style={{ maxHeight: "70vh", overflowY: "auto" }}><ReactMarkdown remarkPlugins={[remarkGfm]}>{scorecardMd}</ReactMarkdown></div>
       </Modal>
