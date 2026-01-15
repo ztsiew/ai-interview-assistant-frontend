@@ -166,7 +166,7 @@ export default function App() {
           <Tag color="blue" style={{ fontSize: 10 }}>{t.objective}</Tag>
           <List size="small" dataSource={t.questions} renderItem={(q: any) => (
             <List.Item style={{ padding: "2px 0", border: "none" }}>
-              <Text style={{ fontSize: 12 }} type="secondary">• {q.text}</Text>
+              <Text style={{ fontSize: 13, color: "rgba(0, 0, 0, 0.72)" }} type="secondary">• {q.text}</Text>
             </List.Item>
           )} />
         </div>
@@ -244,22 +244,22 @@ export default function App() {
           /* SETUP VIEW */
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "calc(100vh - 100px)", width: "100%" }}>
             <Card style={{ ...glassStyle, width: 420, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-              <Title level={4} style={{ textAlign: "center", marginBottom: 24 }}>Setup & Configuration</Title>
+              <Title level={4} style={{ textAlign: "center", marginBottom: 24 }}>Interview Setup & Configuration</Title>
               <Space direction="vertical" size={16} style={{ width: "100%" }}>
                 <div>
                   <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>1. INTERVIEW PLAN</Text>
                   <Input type="file" accept=".pdf" onChange={handlePdfUpload} size="small" style={{ marginTop: 4 }} />
                   {planName && activePlanData && (
-                    <div style={{ marginTop: 8 }}>
-                       <Text type="success" style={{ fontSize: 12 }}>Loaded: <b>{planName}</b></Text>
-                       <Button size="small" icon={<EyeOutlined />} onClick={() => setViewPlanOpen(true)} block style={{ marginTop: 4 }}>View Generated Strategy</Button>
+                    <div style={{ marginTop: 1 }}>
+                       <Text type="success" style={{ fontSize: 12, color: "black" }}>Loaded: <b>{planName}</b></Text>
+                       <Button size="small" icon={<EyeOutlined />} onClick={() => setViewPlanOpen(true)} block style={{ marginTop: 12 }}>View Generated Strategy</Button>
                     </div>
                   )}
                 </div>
                 <div>
-                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. AI INSTRUCTIONS</Text>
-                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 11 }} placeholder="e.g. 'Use echo probes'..." />
-                  <Button size="small" onClick={() => updateConfig(customPrompt)} block style={{ marginTop: 4 }}>Update Rules</Button>
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. CUSTOM INSTRUCTIONS</Text>
+                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 13, fontStyle: "italic" }} placeholder="e.g. 'Keep your responses concise'..." />
+                  <Button size="small" onClick={() => updateConfig(customPrompt)} block style={{ marginTop: 4 }}>Update</Button>
                 </div>
                 <div>
                   <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>3. TARGET DURATION (MINS)</Text>
@@ -290,7 +290,7 @@ export default function App() {
                   Stop & Score
                 </Button>
                 <Divider style={{ margin: "4px 0", fontSize: 10 }}>LIVE TRANSCRIPT</Divider>
-                <div style={{ flex: 1, overflowY: "auto", fontSize: "11px", lineHeight: "1.5", padding: "10px", background: "rgba(255,255,255,0.5)", borderRadius: 8, border: "1px solid #eee" }}>
+                <div style={{ height: 500, overflowY: "auto", fontSize: "10px", lineHeight: "1.5", padding: "10px", background: "rgba(255,255,255,0.5)", borderRadius: 8, border: "1px solid #eee" }}>
                   {transcript.map((segment, index) => (
                     <span key={index} style={{ color: index === transcript.length - 1 ? "#000" : "#666", fontWeight: index === transcript.length - 1 ? "bold" : "normal" }}>{segment}{" "}</span>
                   ))}
@@ -299,7 +299,7 @@ export default function App() {
             </Sider>
 
             <Content style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Card title="🗺️ Strategy Mapping" style={{ ...glassStyle, flex: 1.2, overflow: "hidden" }} styles={{ body: { height: "100%", overflowY: "auto", padding: 16 }}}>
+              <Card title="🗺️ Strategy Mapping" style={{ ...glassStyle, height: 450, overflow: "hidden" }} styles={{ body: { height: "100%", overflowY: "auto", padding: 16 }}}>
                 {activePlanData ? <VisualSteps /> : <div style={{ textAlign: "center", padding: 40 }}><FilePdfOutlined style={{ fontSize: 30, color: "#ccc" }} /><br/><Text type="secondary">No plan loaded.</Text></div>}
               </Card>
 

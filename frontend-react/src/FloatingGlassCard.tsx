@@ -64,10 +64,14 @@ export function FloatingGlassCard({ type, text, onDismiss }: FloatingGlassCardPr
             <Text
               style={{
                 color: accentColor,
-                fontSize: 12,
-                letterSpacing: 0.06,
-                fontWeight: 600,
+                fontSize: 15,
+                letterSpacing: 0.1,
+                fontWeight: 750,
                 textTransform: "uppercase",
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+               
+
               }}
             >
               {label}
@@ -76,8 +80,8 @@ export function FloatingGlassCard({ type, text, onDismiss }: FloatingGlassCardPr
             {/* Rich Text Content (Markdown) */}
             <div 
               style={{ 
-                marginTop: 12, 
-                fontSize: 17, 
+                marginTop: 2, 
+                fontSize: 15, 
                 lineHeight: 1.6, 
                 color: "#0f172a",
                 maxHeight: "60vh", 
