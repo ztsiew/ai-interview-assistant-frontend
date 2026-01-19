@@ -20,6 +20,7 @@ import {
   EyeOutlined,
   FilePdfOutlined,
   ArrowRightOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -55,7 +56,6 @@ export default function App() {
   const prevEmpathyRef = useRef<string>("");
   const API_URL = "http://localhost:8000";
 
-  // --- STYLES ---
   const glassStyle = {
     background: "rgba(230, 247, 255, 0.6)", 
     backdropFilter: "blur(12px)",
@@ -95,9 +95,11 @@ export default function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ custom_prompt: promptText }),
     });
+    message.success("Directives updated");
   }
 
   async function startRecording() { await fetch(`${API_URL}/start`, { method: "POST" }); }
+  
   async function stopRecording() {
     const res = await fetch(`${API_URL}/stop`, { method: "POST" });
     return await res.json();
@@ -107,13 +109,18 @@ export default function App() {
   async function refreshStatusOnce() {
     try {
       const s = await getStatus();
-      setIsRecording(s.is_recording);
+      // FIX: Only update isRecording from server if we aren't currently stopping.
+      // This prevents the "jump" back to setup while the scorecard generates.
+      if (!isStopping && !scorecardMd) {
+        setIsRecording(s.is_recording);
+      }
+      
       setTranscript(s.transcript_list || []);
       setFollowup(s.followup || "Waiting for insights...");
       setTransition(s.transition || "Waiting for insights...");
       const nextEmpathy = s.empathy || "Waiting for insights...";
       setEmpathy(nextEmpathy);
-      // Determine if a new empathy/insight status has arrived
+      
       if (nextEmpathy && nextEmpathy !== prevEmpathyRef.current && !/status:\s*normal/i.test(nextEmpathy)) {
         setHasNewEmpathy(true);
       }
@@ -122,20 +129,46 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (isRecording) { pollTimer.current = window.setInterval(refreshStatusOnce, 1000); }
+    // Stop polling once scorecard is generating or complete
+    if (isRecording && !isStopping && !scorecardMd) { 
+      pollTimer.current = window.setInterval(refreshStatusOnce, 1000); 
+    }
     else { if (pollTimer.current) window.clearInterval(pollTimer.current); }
     return () => { if (pollTimer.current) window.clearInterval(pollTimer.current); };
-  }, [isRecording]);
+  }, [isRecording, isStopping, scorecardMd]);
 
   useEffect(() => {
     let clockInterval: number;
-    if (isRecording && startTime) {
+    if (isRecording && startTime && !isStopping && !scorecardMd) {
       clockInterval = window.setInterval(() => {
         setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
       }, 1000);
     }
     return () => clearInterval(clockInterval);
-  }, [isRecording, startTime]);
+  }, [isRecording, startTime, isStopping, scorecardMd]);
+
+  // --- NEW: Add Keyboard Listener for ESC Key ---
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActivePrompt(null);
+        // Also reset empathy status if the empathy prompt was open
+        if (activePrompt?.type === "empathy") {
+          setHasNewEmpathy(false);
+        }
+      }
+    };
+
+    // Add listener when a prompt is active
+    if (activePrompt) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+
+    // Cleanup the listener
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activePrompt]);
 
   // --- HANDLERS ---
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,15 +183,28 @@ export default function App() {
     } catch (err) { message.error("Upload failed"); } finally { hide(); }
   };
 
+  const handleStopAndScore = async () => {
+    setIsStopping(true); // This locally keeps the "Live View" active
+    try {
+      const res = await stopRecording();
+      setScorecardMd(res.scorecard || "");
+      if (res.scorecard) setScorecardOpen(true);
+    } catch (e) {
+      message.error("Failed to generate scorecard");
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
   const VisualSteps = () => (
     <Steps direction="vertical" size="small" items={activePlanData?.interview_guides_collection[0].themes.map((t: any) => ({
-      title: <Text strong style={{ fontSize: 14, color: "#1e293b" }}>{t.title}</Text>,
+      title: <Text strong style={{ fontSize: 14 }}>{t.title}</Text>,
       description: (
         <div style={{ marginBottom: 12 }}>
           <Tag color="blue" style={{ fontSize: 10 }}>{t.objective}</Tag>
           <List size="small" dataSource={t.questions} renderItem={(q: any) => (
             <List.Item style={{ padding: "2px 0", border: "none" }}>
-              <Text style={{ fontSize: 13, color: "#475569" }}>• {q.text}</Text>
+              <Text style={{ fontSize: 13, color: "rgba(0, 0, 0, 0.72)" }} type="secondary">• {q.text}</Text>
             </List.Item>
           )} />
         </div>
@@ -173,10 +219,11 @@ export default function App() {
   };
 
   const statusUi = useMemo(() => {
-    if (isStopping) return { badgeStatus: "processing" as const, tagColor: "gold", text: "Generating Scorecard…", blink: false };
+    if (scorecardMd) return { badgeStatus: "success" as const, tagColor: "green", text: "Interview Completed", blink: false };
+    if (isStopping) return { badgeStatus: "processing" as const, tagColor: "gold", text: "Analyzing session...", blink: false };
     if (isRecording) return { badgeStatus: "processing" as const, tagColor: "red", text: "LIVE RECORDING", blink: true };
     return { badgeStatus: "default" as const, tagColor: "default", text: "System Ready", blink: false };
-  }, [isRecording, isStopping]);
+  }, [isRecording, isStopping, scorecardMd]);
 
   if (showLanding) {
     return (
@@ -188,7 +235,7 @@ export default function App() {
           <div style={{ ...glassStyle, padding: "60px 40px", textAlign: "center", maxWidth: 700, boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
             <Title level={1} style={{ marginBottom: 16 }}>Welcome to AI Interview Assistant!</Title>
             <Text style={{ fontSize: 19, display: "block", marginBottom: 32, color: "#222", fontWeight: 500 }}>
-              An intelligent companion providing real-time guidance and strategic support.
+              An intelligent companion providing real-time guidance and strategic support directly to the interviewer.
             </Text>
             <Button type="primary" size="large" icon={<ArrowRightOutlined />} onClick={() => setShowLanding(false)} style={{ height: 55, paddingInline: 40, borderRadius: 8, fontSize: 18, fontWeight: 'bold' }}>
               GET STARTED
@@ -200,14 +247,14 @@ export default function App() {
   }
 
   return (
-    <Layout className="app-shell" style={{ minHeight: "100vh", background: isRecording ? "#f0f2f5" : "transparent", ...( !isRecording ? sharedBackgroundStyle : {} ) }}>
-      <Header style={{ background: isRecording ? "transparent" : "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "space-between", paddingInline: 24, height: 64 }}>
+    <Layout className="app-shell" style={{ minHeight: "100vh", background: isRecording || isStopping || scorecardMd ? "#f0f2f5" : "transparent", ...(!isRecording && !isStopping && !scorecardMd ? sharedBackgroundStyle : {}) }}>
+      <Header style={{ background: isRecording || isStopping || scorecardMd ? "transparent" : "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "space-between", paddingInline: 24, height: 64 }}>
         <Space size={12}>
           <AudioOutlined style={{ fontSize: 20, color: "#1890ff" }} />
           <Title level={4} style={{ margin: 0 }}>AI Interview Assistant</Title>
         </Space>
         <Space>
-          {isRecording && (
+          {(isRecording || isStopping || scorecardMd) && (
             <Tag color={elapsedSeconds > (allocatedTime * 60) ? "error" : "blue"} style={{ borderRadius: 999, fontWeight: 'bold' }}>
               {formatTime(elapsedSeconds)} / {formatTime(allocatedTime * 60)}
             </Tag>
@@ -218,19 +265,25 @@ export default function App() {
       </Header>
 
       <Layout style={{ padding: "0 16px 16px", background: "transparent" }}>
-        {!isRecording ? (
+        {!isRecording && !isStopping && !scorecardMd ? (
           /* SETUP VIEW */
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "calc(100vh - 100px)", width: "100%" }}>
             <Card style={{ ...glassStyle, width: 420, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-              <Title level={4} style={{ textAlign: "center", marginBottom: 24 }}>Setup & Configuration</Title>
+              <Title level={4} style={{ textAlign: "center", marginBottom: 24 }}>Interview Setup & Configuration</Title>
               <Space direction="vertical" size={16} style={{ width: "100%" }}>
                 <div>
                   <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>1. INTERVIEW PLAN</Text>
                   <Input type="file" accept=".pdf" onChange={handlePdfUpload} size="small" style={{ marginTop: 4 }} />
+                  {planName && activePlanData && (
+                    <div style={{ marginTop: 1 }}>
+                       <Text type="success" style={{ fontSize: 12, color: "black" }}>Loaded: <b>{planName}</b></Text>
+                       <Button size="small" icon={<EyeOutlined />} onClick={() => setViewPlanOpen(true)} block style={{ marginTop: 12 }}>View Generated Strategy</Button>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. STRATEGIC DIRECTIVES</Text>
-                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 11 }} />
+                  <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>2. CUSTOM INSTRUCTIONS</Text>
+                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 13, fontStyle: "italic" }} placeholder="e.g. 'Keep your responses concise'..." />
                 </div>
                 <div>
                   <Text type="secondary" style={{ fontWeight: 700, fontSize: 10 }}>3. TARGET DURATION (MINS)</Text>
@@ -257,22 +310,48 @@ export default function App() {
                     style={{ 
                       fontWeight: 700, 
                       fontSize: 10, 
-                      // Turns pinkish if a new insight arrives, otherwise stays grey
-                      color: hasNewEmpathy ? "#e11d48" : "rgba(0, 0, 0, 0.45)", 
+                      color: hasNewEmpathy ? "#eb2f96" : "rgba(0, 0, 0, 0.45)", 
                       transition: "color 0.3s ease",
                       display: "block"
                     }}
                   >
-                    2. STRATEGIC DIRECTIVES {hasNewEmpathy && "• NEW INSIGHT"}
+                    2. AI INSTRUCTIONS {hasNewEmpathy && "• NEW INSIGHT"}
                   </Text>
-                  <Input.TextArea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} rows={3} style={{ marginTop: 4, fontSize: 11 }} />
-                  <Button size="small" onClick={() => updateConfig(customPrompt)} block style={{ marginTop: 4 }}>Update Rules</Button>
+                  <Input.TextArea 
+                    value={customPrompt} 
+                    onChange={(e) => setCustomPrompt(e.target.value)} 
+                    rows={3} 
+                    style={{ marginTop: 4, fontSize: 11 }} 
+                    disabled={isStopping || !!scorecardMd} // Disabled when stopping or scored
+                  />
+                  <Button 
+                    size="small" 
+                    onClick={() => updateConfig(customPrompt)} 
+                    block 
+                    style={{ marginTop: 4 }}
+                    disabled={isStopping || !!scorecardMd} // Disabled when stopping or scored
+                  >
+                    Update Rules
+                  </Button>
                 </div>
-                <Button type="primary" danger block size="large" onClick={async () => { setIsStopping(true); const res = await stopRecording(); setScorecardMd(res.scorecard || ""); if (res.scorecard) setScorecardOpen(true); setIsRecording(false); setIsStopping(false); }}>
-                  Stop & Score
-                </Button>
+
+                {!scorecardMd ? (
+                  <Button type="primary" danger block size="large" loading={isStopping} onClick={handleStopAndScore}>
+                    Stop & Score
+                  </Button>
+                ) : (
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Button block icon={<EyeOutlined />} onClick={() => setScorecardOpen(true)}>
+                      Re-open Scorecard
+                    </Button>
+                    <Button block type="link" onClick={() => { setIsRecording(false); setScorecardMd(""); }}>
+                      Exit to Setup
+                    </Button>
+                  </Space>
+                )}
+
                 <Divider style={{ margin: "4px 0", fontSize: 10 }}>LIVE TRANSCRIPT</Divider>
-                <div style={{ height: 500, overflowY: "auto", fontSize: "11px", lineHeight: "1.5", padding: "10px", background: "rgba(255,255,255,0.5)", borderRadius: 8, border: "1px solid #eee" }}>
+                <div style={{ height: 500, overflowY: "auto", fontSize: "10px", lineHeight: "1.5", padding: "10px", background: "rgba(255,255,255,0.5)", borderRadius: 8, border: "1px solid #eee" }}>
                   {transcript.map((segment, index) => (
                     <span key={index} style={{ color: index === transcript.length - 1 ? "#000" : "#666", fontWeight: index === transcript.length - 1 ? "bold" : "normal" }}>{segment}{" "}</span>
                   ))}
@@ -281,16 +360,18 @@ export default function App() {
             </Sider>
 
             <Content style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Card title="🗺️ Strategy Mapping" style={{ ...glassStyle, flex: 1.2, overflow: "hidden" }} styles={{ body: { height: "100%", overflowY: "auto", padding: 16 }}}>
+              <Card title="🗺️ Strategy Mapping" style={{ ...glassStyle, height: 450, overflow: "hidden" }} styles={{ body: { height: "100%", overflowY: "auto", padding: 16 }}}>
                 {activePlanData ? <VisualSteps /> : <div style={{ textAlign: "center", padding: 40 }}><FilePdfOutlined style={{ fontSize: 30, color: "#ccc" }} /><br/><Text type="secondary">No plan loaded.</Text></div>}
               </Card>
 
               <Card title="💡 AI Coaching Insights" style={{ ...glassStyle, position: "relative", overflow: "hidden" }} styles={{ body: { padding: 0, minHeight: 320 } }} bordered={false}>
                 <div style={{ padding: "10px 12px 12px" }}>
-                  <MagicActionDeck hasNewEmpathy={hasNewEmpathy} onActionClick={(type) => {
+                  <MagicActionDeck 
+                    hasNewEmpathy={hasNewEmpathy} 
+                    onActionClick={(type) => {
                       let content = type === "deepen" ? followup : type === "shift" ? transition : empathy;
                       setActivePrompt({ type, content: content || "Generating..." });
-                      if (type === "empathy") setHasNewEmpathy(false); // Reset status once viewed
+                      if (type === "empathy") setHasNewEmpathy(false);
                     }}
                   />
                   {activePrompt && <FloatingGlassCard type={activePrompt.type} text={activePrompt.content.trim()} onDismiss={() => setActivePrompt(null)} />}
@@ -301,8 +382,21 @@ export default function App() {
         )}
       </Layout>
 
-      <Modal title="📊 Interview Scorecard" open={scorecardOpen} onCancel={() => setScorecardOpen(false)} width={800} footer={null}>
-        <div style={{ maxHeight: "70vh", overflowY: "auto" }}><ReactMarkdown remarkPlugins={[remarkGfm]}>{scorecardMd}</ReactMarkdown></div>
+      {/* MODALS */}
+      <Modal title="🗺️ Plan Preview" open={viewPlanOpen} onCancel={() => setViewPlanOpen(false)} footer={[<Button key="close" onClick={() => setViewPlanOpen(false)}>Close</Button>]} width={700}>
+        {activePlanData ? <Tabs items={[{ key: "1", label: "Visual Overview", children: <VisualSteps /> }, { key: "2", label: "Raw JSON", children: <div style={{ background: "#1e293b", color: "#e2e8f0", padding: 12, borderRadius: 8, fontSize: 10, maxHeight: "400px", overflow: "auto" }}><pre>{JSON.stringify(activePlanData, null, 2)}</pre></div> }]} /> : <Text type="secondary">No data.</Text>}
+      </Modal>
+      
+      <Modal 
+        title="📊 Interview Scorecard" 
+        open={scorecardOpen} 
+        onCancel={() => setScorecardOpen(false)} 
+        width={800} 
+        footer={[<Button key="close" type="primary" onClick={() => setScorecardOpen(false)}>Close Preview</Button>]}
+      >
+        <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{scorecardMd}</ReactMarkdown>
+        </div>
       </Modal>
     </Layout>
   );
